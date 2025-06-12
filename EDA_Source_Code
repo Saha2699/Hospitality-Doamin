@@ -1,0 +1,14 @@
+import pandas as pd
+import numpy as np
+
+print(fact_aggregated_bookings.describe())
+print(fact_bookings.head())
+print(fact_bookings.describe())
+fact_bookings['booking_platform'].value_counts().plot(kind='bar')
+plt.show()
+print(df_dim_hotels.groupby(['category','city'])['property_id'].count())
+print(fact_aggregated_bookings.head())
+print(fact_aggregated_bookings.groupby(['check_in_date'])['successful_bookings'].sum().sort_values(ascending=False))
+print(fact_aggregated_bookings.groupby(['property_id'])['successful_bookings'].sum().sort_values(ascending=False))
+print(fact_aggregated_bookings.groupby(['property_id'])['successful_bookings'].sum().sort_values(ascending=False))
+print(df_dim_hotels[df_dim_hotels['property_id']==18559])
