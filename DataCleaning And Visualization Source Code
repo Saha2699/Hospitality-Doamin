@@ -1,0 +1,174 @@
+from itertools import count
+
+import pandas as pd
+from matplotlib import pyplot as plt
+import seaborn as sns
+import numpy as np
+pd.set_option('display.max_columns',None)
+pd.set_option('display.width',None)
+
+df_dim_date=pd.read_csv('C:\\Users\\HP\\Downloads\\Hospitality_Domain\\dim_date.csv')
+df_dim_hotels=pd.read_csv('C:\\Users\\HP\\Downloads\\Hospitality_Domain\\dim_hotels.csv')
+df_dim_rooms=pd.read_csv('C:\\Users\\HP\\Downloads\\Hospitality_Domain\\dim_rooms.csv')
+fact_aggregated_bookings=pd.read_csv('C:\\Users\\HP\\Downloads\\Hospitality_Domain\\fact_aggregated_bookings.csv')
+fact_bookings=pd.read_csv('C:\\Users\\HP\\Downloads\\Hospitality_Domain\\fact_bookings.csv')
+
+#DataTransformation
+fact_bookings=fact_bookings[fact_bookings['no_guests']>0]
+
+avg=fact_bookings['revenue_generated'].mean()
+std_bookings=fact_bookings['revenue_generated'].std()
+higher_limit=avg+(3*std_bookings)
+lower_limit=avg-(3*std_bookings)
+fact_bookings=fact_bookings[fact_bookings['revenue_generated']<higher_limit]
+
+#print(fact_bookings['ratings_given'].describe())
+
+fact_aggregated_bookings['flag']=np.where(fact_aggregated_bookings['successful_bookings']>fact_aggregated_bookings['capacity'],'yes','no')
+fact_aggregated_bookings=fact_aggregated_bookings[fact_aggregated_bookings['flag']=='no']
+
+#print(fact_aggregated_bookings[fact_aggregated_bookings['capacity'].isnull()])
+
+fact_aggregated_bookings_mode=fact_aggregated_bookings[fact_aggregated_bookings.room_category=='RT1']
+mode_value=fact_aggregated_bookings_mode['capacity'].mode()[0]
+#print(mode_value)
+fact_aggregated_bookings['capacity'].fillna(mode_value,inplace=True)
+#print(fact_aggregated_bookings[fact_aggregated_bookings['capacity'].isnull()])
+
+fact_aggregated_bookings['occ_pct']=round((fact_aggregated_bookings['successful_bookings']/fact_aggregated_bookings['capacity'])*100,2)
+
+
+#visual for avg occ pct vs room_class
+df_booking_category=pd.merge(fact_aggregated_bookings,df_dim_rooms,left_on='room_category',right_on='room_id',how='inner')
+df_booking_category=df_booking_category.groupby('room_class').agg(avg_occ=('occ_pct',np.average))
+
+print(df_booking_category)
+#sns.barplot(data=df_booking_category,x='room_class',y='avg_occ')
+#plt.title('average occupancy_pct by room_class')
+#plt.show()
+
+#print(fact_bookings)
+total_bookings=fact_bookings['booking_id'].count()
+
+#pie chart bpoking_status pct
+df_platform_agg_details=fact_bookings.groupby(['booking_status'],as_index=False).agg(no_of_counts=('booking_id','count'))
+df_platform_agg_details['pct']=round((df_platform_agg_details['no_of_counts']/total_bookings)*100,2)
+#print(df_platform_agg_details)
+df_platform_agg_details=df_platform_agg_details.set_index('booking_status')
+labels_1=list(df_platform_agg_details.index.values)
+
+df_platform_agg_details=df_platform_agg_details[['pct']]
+data_1=np.array(df_platform_agg_details['pct'])
+#print(data_1)
+
+#plt.pie(data_1,labels=labels_1,autopct='%1.1f%%')
+#plt.title('booking_status_pct')
+
+#plt.show()
+
+#hoetl wise ratings
+df_fact_bk_hotels=pd.merge(fact_bookings,df_dim_hotels,on='property_id')
+df_fact_bk_hotels=df_fact_bk_hotels.groupby(['city'],as_index=False).agg(total_revenue=('revenue_realized',sum))
+
+print(df_fact_bk_hotels)
+#sns.lineplot(data=df_fact_bk_hotels,x='city',y='total_revenue')
+#plt.xticks(rotation=30)
+#plt.yticks(df_fact_bk_hotels['total_revenue'])
+
+#plt.show()
+
+#month wise booking
+#fact_bookings['checkout_date']=fact_bookings['checkout_date'].replace('-',"/",regex=True)
+#fact_bookings[['day','month','year']]=fact_bookings['checkout_date'].str.split('/',expand=True)
+#fact_bookings['actual_year']=np.where(fact_bookings['year']=='22','2022',fact_bookings['year'])
+#fact_bookings['actual_date']=fact_bookings['month']+"/"+fact_bookings['day']+"/"+fact_bookings['actual_year']
+#fact_bookings['actual_date']=pd.to_datetime(fact_bookings['actual_date'])
+#fact_bookings['actual_date']=fact_bookings['actual_date'].dt.strftime('%m/%d/%y')
+#print(fact_bookings)
+#act_bookings['month_name']=fact_bookings['actual_date_1'].dt.month_name()
+#fact_bookings['month_no']=fact_bookings['actual_date_1'].dt.month
+
+#month_wise_booking=fact_bookings.groupby(['month_name','month_no'],as_index=False).agg(total_bookings=('booking_id','count'))
+#month_wise_booking=month_wise_booking.sort_values(by='month_no',ascending=True)
+#sns.lineplot(data=month_wise_booking,x='month_name',y='total_bookings')
+#plt.title('month_wise_bookings')
+#plt.show()
+
+#weekday vs weekend occ%
+fact_bookings['check_in_date']=fact_bookings['check_in_date'].replace('-',"/",regex=True)
+fact_bookings[['day','month','year']]=fact_bookings['check_in_date'].str.split('/',expand=True)
+fact_bookings['actual_year']=np.where(fact_bookings['year']=='22','2022',fact_bookings['year'])
+fact_bookings['actual_date']=fact_bookings['month']+"/"+fact_bookings['day']+"/"+fact_bookings['actual_year']
+fact_bookings['actual_date']=pd.to_datetime(fact_bookings['actual_date'])
+#print(fact_bookings)
+
+
+df_dim_date['date']=pd.to_datetime(df_dim_date['date'])
+df_dim_date['date']=df_dim_date['date'].dt.strftime('%m/%d/%y')
+df_dim_date[['month','day','year']]=df_dim_date['date'].str.split('/',expand=True)
+df_dim_date['actual_year']=np.where(df_dim_date['year']=='22','2022',df_dim_date['year'])
+df_dim_date['actual_date']=df_dim_date['month']+"/"+df_dim_date['day']+"/"+df_dim_date['actual_year']
+df_dim_date['actual_date']=pd.to_datetime(df_dim_date['actual_date'])
+fact_bookings_weekday=pd.merge(fact_bookings,df_dim_date,on='actual_date')
+
+
+#dognout chart for weekend weekdaybookings
+fact_bookings_weekday_checkout=fact_bookings_weekday[fact_bookings_weekday['booking_status']=='Checked Out']
+total_id=fact_bookings_weekday_checkout['booking_id'].count()
+fact_bookings_weekday_grp=fact_bookings_weekday_checkout.groupby(['day_type'],as_index=False).agg(total_bookings=('booking_id','count'))
+fact_bookings_weekday_grp['booking_pct']=round((fact_bookings_weekday_grp['total_bookings']/total_id)*100,2)
+x_data=fact_bookings_weekday_grp['booking_pct']
+fact_labels=fact_bookings_weekday_grp['day_type']
+#plt.pie(x_data,labels=fact_labels,autopct='%1.1f%%')
+#center_circle=plt.Circle((0,0),0.70,fc='white')
+#fig=plt.gcf()
+#fig.gca().add_artist(center_circle)
+#plt.title("weekend vs weekday booking pct")
+#plt.show()
+#print(fact_bookings)
+
+#correlataion between ratings and revenue
+fact_booking_cor=fact_bookings[['ratings_given','revenue_generated']]
+#print(fact_booking_cor.corr())
+
+#property wise revenue
+fact_bookings_weekday_property=pd.merge(fact_bookings_weekday,df_dim_hotels,on='property_id')
+
+fact_bookings_weekday_property_grp=fact_bookings_weekday_property.groupby(['property_name'],as_index=False).agg(total_revenue=('revenue_realized',sum))
+#plt.figure(figsize=(8,5))
+#plt.barh(fact_bookings_weekday_property_grp['property_name'],fact_bookings_weekday_property_grp['total_revenue'],color='red')
+#plt.title('property_wise_revenue')
+
+#plt.show()
+
+#property wise cancellation percentage
+
+property_total_bookings=fact_bookings_weekday_property.groupby(['property_name'],as_index=False).agg(total_bookings=('booking_id','count'))
+cancelled_booking_details=fact_bookings_weekday_property[fact_bookings_weekday_property['booking_status']=='Cancelled']
+cancelled_booking_details_grp=cancelled_booking_details.groupby(['property_name'],as_index=False).agg(total_cancelled_bookings=('booking_id','count'))
+
+property_cancelled_total_bookings=pd.merge(cancelled_booking_details_grp,property_total_bookings,on='property_name')
+
+property_cancelled_total_bookings['cancellation_pct']=round((property_cancelled_total_bookings['total_cancelled_bookings']/property_cancelled_total_bookings['total_bookings'])*100,2)
+cancelled_pct_data=property_cancelled_total_bookings['cancellation_pct']
+cancelled_pct_data_labels=property_cancelled_total_bookings['property_name']
+#print(property_cancelled_total_bookings)
+#plt.pie(cancelled_pct_data,labels=cancelled_pct_data_labels,autopct=cancelled_pct_data_labels)
+#plt.show()
+#print(property_cancelled_total_bookings)
+
+#week wise revenue trend
+fact_bookings_weekday_checkout=fact_bookings_weekday_checkout.groupby(['week no'],as_index=False).agg(total_revenue=('revenue_realized',sum))
+plt.figure(figsize=(8,5))
+sns.lineplot(data=fact_bookings_weekday_checkout,x='week no',y='total_revenue',color='maroon')
+#plt.title('weekwise_revenue')
+#plt.show()
+#print(fact_bookings_weekday_checkout)
+
+
+#property wise avg_rating
+fact_bookings_weekday_property_rating_grp=fact_bookings_weekday_property.groupby(['property_name'],as_index=False).agg(avg_rating=('ratings_given',np.mean))
+fact_bookings_weekday_property_rating_grp['avg_rating']=round(fact_bookings_weekday_property_rating_grp['avg_rating'],2)
+print(fact_bookings_weekday_property_rating_grp.sort_values(by='avg_rating'))
+
+
